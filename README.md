@@ -6,6 +6,8 @@ The screen splits into two zones. Player 1 taps the left side; Player 2 taps the
 
 The point of this project is to show the real bondades of KMP — shared game logic, shared UI, platform code only where it earns its keep — on a tiny but complete game.
 
+![Tap Duel demo](assets/demo.gif)
+
 ![Tap Duel running on the Android emulator next to the README in Android Studio](assets/android_studio_setup.png)
 
 ## How the game works
