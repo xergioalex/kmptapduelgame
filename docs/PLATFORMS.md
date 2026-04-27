@@ -18,7 +18,7 @@ Per-target reference: entry point, capabilities, gotchas. Read the section for t
 
 ### Entry point
 
-`composeApp/src/androidMain/kotlin/com/xergioalex/kmptodoapp/MainActivity.kt`:
+`composeApp/src/androidMain/kotlin/com/xergioalex/kmptapduelgame/MainActivity.kt`:
 
 ```kotlin
 class MainActivity : ComponentActivity() {
@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
 
 In `composeApp/build.gradle.kts`:
 
-- `applicationId` and `namespace`: `com.xergioalex.kmptodoapp`
+- `applicationId` and `namespace`: `com.xergioalex.kmptapduelgame`
 - `compileSdk = 36`, `minSdk = 24`, `targetSdk = 36`
 - `versionCode = 1`, `versionName = "1.0"`
 - `release { isMinifyEnabled = false }` — **change for production** (see [Performance](PERFORMANCE.md))
@@ -146,7 +146,7 @@ struct iOSApp: App {
 ```kotlin
 // jvmMain/main.kt
 fun main() = application {
-    Window(onCloseRequest = ::exitApplication, title = "KMPTodoApp") {
+    Window(onCloseRequest = ::exitApplication, title = "KMPTapDuelGame") {
         App()
     }
 }
@@ -159,10 +159,10 @@ In `composeApp/build.gradle.kts`:
 ```kotlin
 compose.desktop {
     application {
-        mainClass = "com.xergioalex.kmptodoapp.MainKt"
+        mainClass = "com.xergioalex.kmptapduelgame.MainKt"
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "com.xergioalex.kmptodoapp"
+            packageName = "com.xergioalex.kmptapduelgame"
             packageVersion = "1.0.0"
         }
     }

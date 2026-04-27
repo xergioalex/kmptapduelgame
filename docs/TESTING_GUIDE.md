@@ -1,6 +1,6 @@
 # Testing Guide
 
-How to write and run tests in KMPTodoApp. The starter ships with `kotlin.test` only — that's enough for shared logic. Add UI testing libraries when you start needing them.
+How to write and run tests in KMPTapDuelGame. The starter ships with `kotlin.test` only — that's enough for shared logic. Add UI testing libraries when you start needing them.
 
 ## Where tests live
 
@@ -22,7 +22,7 @@ The starter currently has only `commonTest`. Add the others on demand — the so
 ./gradlew :composeApp:jvmTest                  # Fastest — recommended default
 ./gradlew :composeApp:testDebugUnitTest        # Android unit
 ./gradlew :composeApp:iosSimulatorArm64Test    # iOS simulator
-./gradlew :composeApp:jvmTest --tests "com.xergioalex.kmptodoapp.GreetingTest.greetsCurrentPlatform"
+./gradlew :composeApp:jvmTest --tests "com.xergioalex.kmptapduelgame.game.TapDuelGameTest.playerOneWinsAfterEnoughNetTaps"
 ./gradlew :composeApp:jvmTest --continuous     # Watch mode
 ```
 
@@ -30,31 +30,33 @@ Reports land at `composeApp/build/reports/tests/<task>/index.html`.
 
 ## Conventions
 
-1. **Mirror the production package** — `commonTest/kotlin/com/xergioalex/kmptodoapp/Greeting.kt` becomes `commonTest/kotlin/com/xergioalex/kmptodoapp/GreetingTest.kt`
-2. **Class name = production class + `Test`** (`Greeting` → `GreetingTest`)
-3. **Method name describes the behavior** — `returnsHelloWithPlatformName`. Keep them in `camelCase` for portability across Native/Wasm runners.
+1. **Mirror the production package** — `commonMain/.../game/TapDuelGame.kt` becomes `commonTest/.../game/TapDuelGameTest.kt`
+2. **Class name = production class + `Test`** (`TapDuelGame` → `TapDuelGameTest`)
+3. **Method name describes the behavior** — `playerOneWinsAfterEnoughNetTaps`. Keep them in `camelCase` for portability across Native/Wasm runners.
 4. **Arrange / Act / Assert** structure with a blank line between sections
 5. **One behavior per test method.** If a test name needs "and", split it.
 6. **No shared mutable state** between tests — tear down or use fresh instances each test
 
 ```kotlin
-package com.xergioalex.kmptodoapp
+package com.xergioalex.kmptapduelgame.game
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class GreetingTest {
+class TapDuelGameTest {
+
+    private val game = TapDuelGame()
 
     @Test
-    fun returnsHelloWithPlatformName() {
+    fun playerOneTapMovesDividerRight() {
         // Arrange
-        val greeting = Greeting()
+        val playing = game.start(game.reset())
 
         // Act
-        val result = greeting.greet()
+        val tapped = game.tapPlayerOne(playing)
 
         // Assert
-        assertEquals("Hello, ${getPlatform().name}!", result)
+        assertEquals(1, tapped.playerOneTaps)
     }
 }
 ```
@@ -93,14 +95,16 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 // commonTest
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
-import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
-class TaskRepositoryTest {
+class TapDuelViewModelTest {
     @Test
-    fun loadsTasks() = runTest {
-        val repo = TaskRepository(FakeApi())
-        val tasks = repo.list()
-        assertEquals(3, tasks.size)
+    fun countdownEventuallyTransitionsToPlaying() = runTest {
+        val vm = TapDuelViewModel()
+        vm.start()
+        // virtual time skips the delays
+        testScheduler.advanceUntilIdle()
+        assertNotNull(vm.state.value)
     }
 }
 ```

@@ -1,25 +1,27 @@
 # Architecture
 
-This document explains the **big picture** of KMPTodoApp so a new contributor (human or agent) can be productive quickly. For day-to-day commands see [Development Commands](DEVELOPMENT_COMMANDS.md). For language-specific rules see [Standards](STANDARDS.md).
+This document explains the **big picture** of KMPTapDuelGame so a new contributor (human or agent) can be productive quickly. For day-to-day commands see [Development Commands](DEVELOPMENT_COMMANDS.md). For language-specific rules see [Standards](STANDARDS.md).
 
 ## High-level model
 
 ```
-                          ┌────────────────────────────┐
-                          │  composeApp/commonMain     │
-                          │  ────────────────────────  │
-                          │  • App.kt   (root @Comp.)  │
-                          │  • Greeting.kt (logic)     │
-                          │  • Platform.kt (expect)    │
-                          │  • composeResources/       │
-                          └────────────┬───────────────┘
+                          ┌──────────────────────────────────┐
+                          │  composeApp/commonMain           │
+                          │  ──────────────────────────────  │
+                          │  • App.kt    AppTheme {          │
+                          │              TapDuelScreen() }   │
+                          │  • game/     pure engine         │
+                          │  • ui/       screen + ViewModel  │
+                          │  • Platform.kt (expect)          │
+                          │  • composeResources/             │
+                          └────────────┬─────────────────────┘
                                        │ same Kotlin code
    ┌──────────────┬──────────────┬────┴────┬──────────────┬──────────────┐
    ▼              ▼              ▼         ▼              ▼              ▼
 androidMain    iosMain        jvmMain   webMain        jsMain        wasmJsMain
   ↓              ↓              ↓         ↓              ↓              ↓
-MainActivity   MainView-     application  Compose-     (only        (only
-.setContent    Controller    { Window }   Viewport      actual       actual
+MainActivity   MainView-     application  Compose-     (only         (only
+.setContent    Controller    { Window }   Viewport      actual        actual
   { App() }    { App() }       App()        App()        }              }
    ↓              ↓              ↓         ↓
 Android APK    ComposeApp    Desktop      Web JS bundle
@@ -28,12 +30,12 @@ Android APK    ComposeApp    Desktop      Web JS bundle
                  by Xcode)    Deb)
 ```
 
-Every platform mounts the **same** `App()` composable. Platform source sets only contain the entry-point glue and `actual` declarations.
+Every platform mounts the **same** `App()` composable. Platform source sets only contain the entry-point glue and the `Platform.<target>.kt` actual.
 
 ## Project structure
 
 ```
-KMPTodoApp/
+KMPTapDuelGame/
 ├── AGENTS.md                          # Single source of truth for AI agents
 ├── CLAUDE.md → AGENTS.md              # Symlink (do not edit directly)
 ├── README.md                          # Human-facing intro
@@ -50,37 +52,45 @@ KMPTodoApp/
 │   ├── build.gradle.kts               # KMP target list, source-set deps, Android config
 │   └── src/
 │       ├── commonMain/
-│       │   ├── kotlin/com/xergioalex/kmptodoapp/
-│       │   │   ├── App.kt             # @Composable App — all UI starts here
-│       │   │   ├── Greeting.kt        # Pure-Kotlin shared logic (uses getPlatform())
-│       │   │   └── Platform.kt        # interface Platform + expect fun getPlatform()
+│       │   ├── kotlin/com/xergioalex/kmptapduelgame/
+│       │   │   ├── App.kt             # @Composable App — AppTheme { TapDuelScreen() }
+│       │   │   ├── Platform.kt        # interface Platform + expect fun getPlatform()
+│       │   │   ├── game/
+│       │   │   │   ├── Player.kt
+│       │   │   │   ├── GameStatus.kt
+│       │   │   │   ├── TapDuelState.kt    # @Immutable; dividerPosition derived from taps
+│       │   │   │   └── TapDuelGame.kt     # Pure engine: reset/start/tapPlayerOne/tapPlayerTwo
+│       │   │   └── ui/
+│       │   │       ├── TapDuelScreen.kt   # Split arena, divider, counters, controls, overlays
+│       │   │       ├── TapDuelViewModel.kt # StateFlow + viewModelScope countdown
+│       │   │       └── theme/AppTheme.kt   # Material 3 light/dark color schemes
 │       │   └── composeResources/
-│       │       └── drawable/          # Shared images (compiled into Res object)
-│       ├── commonTest/kotlin/         # Shared kotlin.test tests
+│       │       └── values{,-es}/strings.xml
+│       ├── commonTest/kotlin/com/xergioalex/kmptapduelgame/game/TapDuelGameTest.kt
 │       │
 │       ├── androidMain/
-│       │   ├── kotlin/com/xergioalex/kmptodoapp/
+│       │   ├── kotlin/com/xergioalex/kmptapduelgame/
 │       │   │   ├── MainActivity.kt    # ComponentActivity → setContent { App() }
 │       │   │   └── Platform.android.kt   # actual fun getPlatform()
 │       │   ├── AndroidManifest.xml    # Single MainActivity, MAIN/LAUNCHER intent filter
 │       │   └── res/                   # Android-only resources (icons, strings)
 │       │
-│       ├── iosMain/kotlin/com/xergioalex/kmptodoapp/
+│       ├── iosMain/kotlin/com/xergioalex/kmptapduelgame/
 │       │   ├── MainViewController.kt  # fun MainViewController() = ComposeUIViewController { App() }
 │       │   └── Platform.ios.kt        # actual fun getPlatform()
 │       │
-│       ├── jvmMain/kotlin/com/xergioalex/kmptodoapp/
+│       ├── jvmMain/kotlin/com/xergioalex/kmptapduelgame/
 │       │   ├── main.kt                # application { Window { App() } }
 │       │   └── Platform.jvm.kt        # actual fun getPlatform()
 │       │
 │       ├── webMain/                   # SHARED web entry (used by both JS and Wasm)
-│       │   ├── kotlin/com/xergioalex/kmptodoapp/main.kt   # ComposeViewport { App() }
+│       │   ├── kotlin/com/xergioalex/kmptapduelgame/main.kt   # ComposeViewport { App() }
 │       │   └── resources/index.html   # Web shell (loads composeApp.js)
 │       │
-│       ├── jsMain/kotlin/com/xergioalex/kmptodoapp/
+│       ├── jsMain/kotlin/com/xergioalex/kmptapduelgame/
 │       │   └── Platform.js.kt         # actual fun getPlatform()
 │       │
-│       └── wasmJsMain/kotlin/com/xergioalex/kmptodoapp/
+│       └── wasmJsMain/kotlin/com/xergioalex/kmptapduelgame/
 │           └── Platform.wasmJs.kt     # actual fun getPlatform()
 │
 ├── iosApp/                            # Xcode project — consumes the ComposeApp framework
@@ -163,7 +173,7 @@ actual fun getPlatform(): Platform = IOSPlatform()
 
 ### Resources
 
-Compose Multiplatform compiles `composeApp/src/commonMain/composeResources/` into a generated `kmptodoapp.composeapp.generated.resources.Res` object. Subfolder conventions:
+Compose Multiplatform compiles `composeApp/src/commonMain/composeResources/` into a generated `kmptapduelgame.composeapp.generated.resources.Res` object. Subfolder conventions:
 
 - `drawable/` — vector and raster images, accessed via `Res.drawable.<name>`
 - `values/strings.xml` — base locale strings, accessed via `Res.string.<name>` (qualifiers like `values-es/` add localized variants)
@@ -199,7 +209,7 @@ struct ComposeView: UIViewControllerRepresentable {
 - Targets enabled: `androidTarget()`, `iosArm64()`, `iosSimulatorArm64()`, `jvm()`, `js { browser() }`, `wasmJs { browser() }` — all with executables
 - iOS framework name `ComposeApp`, `isStatic = true`
 - Android: `compileSdk 36`, `minSdk 24`, `targetSdk 36`, Java 11; release build `isMinifyEnabled = false` (flip on for production — see [Performance](PERFORMANCE.md))
-- Desktop: target formats `Dmg`, `Msi`, `Deb`; main class `com.xergioalex.kmptodoapp.MainKt`
+- Desktop: target formats `Dmg`, `Msi`, `Deb`; main class `com.xergioalex.kmptapduelgame.MainKt`
 
 `gradle.properties`:
 

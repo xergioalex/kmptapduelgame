@@ -1,4 +1,4 @@
-# Claude Code Skills & Agents — KMPTodoApp
+# Claude Code Skills & Agents — KMPTapDuelGame
 
 This directory contains **skills** (slash-command procedures) and **agents** (specialized personas) tuned for Kotlin Multiplatform / Compose Multiplatform work in this repo.
 

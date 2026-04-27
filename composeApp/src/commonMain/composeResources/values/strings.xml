@@ -1,48 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_title">KMP Todo App</string>
+    <string name="app_title">Tap Duel</string>
+    <string name="app_subtitle">First to push the line wins</string>
 
-    <string name="filter_all">All</string>
-    <string name="filter_active">Active</string>
-    <string name="filter_done">Done</string>
+    <string name="player_one_label">Player 1</string>
+    <string name="player_two_label">Player 2</string>
+    <string name="taps_label">taps</string>
 
-    <string name="search_placeholder">Search tasks…</string>
-    <string name="empty_no_tasks">No tasks yet</string>
-    <string name="empty_no_results">No tasks match your filter</string>
+    <string name="action_start">Start</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_play_again">Play again</string>
 
-    <string name="action_add">Add task</string>
-    <string name="action_edit">Edit</string>
-    <string name="action_delete">Delete</string>
-    <string name="action_share">Share</string>
-    <string name="action_save">Save</string>
-    <string name="action_cancel">Cancel</string>
-    <string name="action_back">Back</string>
-    <string name="action_settings">Settings</string>
-    <string name="action_clear_completed">Clear completed</string>
+    <string name="ready_prompt">Tap your side as fast as you can.\nFirst to push the line into the opposite color wins.</string>
+    <string name="countdown_go">GO!</string>
+    <string name="winner_overlay_title">%1$s wins!</string>
 
-    <string name="field_title">Title</string>
-    <string name="field_notes">Notes</string>
-    <string name="field_category">Category</string>
-    <string name="field_priority">Priority</string>
-    <string name="field_due_at">Due date</string>
-    <string name="field_done">Done</string>
-    <string name="field_no_due">No due date</string>
-
-    <string name="priority_low">Low</string>
-    <string name="priority_medium">Medium</string>
-    <string name="priority_high">High</string>
-
-    <string name="task_count_active">%1$d active · %2$d done</string>
-    <string name="task_share_template">%1$s\n\n%2$s</string>
-
-    <string name="settings_theme">Theme</string>
-    <string name="settings_theme_system">Follow system</string>
-    <string name="settings_theme_light">Light</string>
-    <string name="settings_theme_dark">Dark</string>
-    <string name="settings_language">Language</string>
-    <string name="settings_language_system">System default</string>
-    <string name="settings_language_english">English</string>
-    <string name="settings_language_spanish">Spanish</string>
-
-    <string name="empty_detail">Select a task or create a new one</string>
+    <string name="player_one_zone_a11y">Player 1 zone, tap to push the divider right</string>
+    <string name="player_two_zone_a11y">Player 2 zone, tap to push the divider left</string>
+    <string name="player_one_taps_a11y">Player 1 has %1$d taps</string>
+    <string name="player_two_taps_a11y">Player 2 has %1$d taps</string>
 </resources>

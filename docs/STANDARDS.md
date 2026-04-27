@@ -1,6 +1,6 @@
 # Standards
 
-Canonical coding rules for KMPTodoApp. Every contributor (human or agent) must follow these. The IDE's Kotlin formatter (`kotlin.code.style=official`) handles most details — these standards cover the things the formatter cannot decide for you.
+Canonical coding rules for KMPTapDuelGame. Every contributor (human or agent) must follow these. The IDE's Kotlin formatter (`kotlin.code.style=official`) handles most details — these standards cover the things the formatter cannot decide for you.
 
 ## Language
 
@@ -11,7 +11,7 @@ Canonical coding rules for KMPTodoApp. Every contributor (human or agent) must f
 
 | Element | Convention | Example |
 |---|---|---|
-| Package | `lowercase.dotted` | `com.xergioalex.kmptodoapp.tasks` |
+| Package | `lowercase.dotted` | `com.xergioalex.kmptapduelgame.tasks` |
 | File | Matches main declaration, `PascalCase.kt` | `TaskListViewModel.kt` |
 | Platform `actual` file | `Foo.<platform>.kt` | `Platform.android.kt` |
 | Class / interface / object | `PascalCase` | `TaskRepository` |
@@ -24,10 +24,10 @@ When the test target is JVM/Android only, backtick-style names are fine: `` `ret
 
 ## Package layout
 
-Single root package: `com.xergioalex.kmptodoapp`. Subpackages by **feature**, not by layer:
+Single root package: `com.xergioalex.kmptapduelgame`. Subpackages by **feature**, not by layer:
 
 ```
-com.xergioalex.kmptodoapp
+com.xergioalex.kmptapduelgame
 ├── tasks/                 # Task list feature
 │   ├── TaskListScreen.kt
 │   ├── TaskListViewModel.kt
@@ -108,7 +108,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import com.xergioalex.kmptodoapp.core.theme.AppTheme
+import com.xergioalex.kmptapduelgame.core.theme.AppTheme
 ```
 
 If your IDE reformats imports differently, your IDE has the wrong style — set "Code Style: Kotlin → Set from… → Kotlin style guide".

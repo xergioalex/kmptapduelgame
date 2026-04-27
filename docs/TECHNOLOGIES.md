@@ -56,9 +56,7 @@ These are the **multiplatform** ports published by JetBrains under `org.jetbrain
 
 | Library | Version | Where | Role |
 |---|---|---|---|
-| `kotlinx-coroutines-swing` | 1.10.2 | `jvmMain` | Provides `Dispatchers.Main` backed by Swing's EDT for the Desktop window |
-
-`commonMain` doesn't declare a coroutines dependency directly — Compose pulls it in transitively. Add it explicitly to the catalog if you start using `kotlinx.coroutines` APIs from shared code.
+| `kotlinx-coroutines-core` | 1.10.2 | `commonMain` | `delay()` for the countdown timer in `TapDuelViewModel` and the StateFlow plumbing |
 
 ## Activity (Android-only)
 

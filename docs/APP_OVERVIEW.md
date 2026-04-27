@@ -1,169 +1,115 @@
-# KMPTodoApp — App Overview
+# KMPTapDuelGame — App Overview
 
-A cross-platform Todo app written **once in `commonMain`** and deployed to **Android, iOS, Desktop (JVM), Web (Wasm), and Web (JS)**. The point of this project is to exercise the real bondades of Kotlin Multiplatform — shared domain, shared UI, platform code only where it earns its keep — on a small but realistic product.
+A local 2-player tap battle written **once in `commonMain`** and deployed to **Android, iOS, Desktop (JVM), Web (Wasm), and Web (JS)**. The point of this project is to exercise the real bondades of Kotlin Multiplatform — shared game logic, shared UI, platform code only where it earns its keep — on a tiny but complete game.
 
 > Looking for the runtime story (gradle commands, IDE setup, troubleshooting)? See [Development Commands](DEVELOPMENT_COMMANDS.md), [Running the App](getting-started/RUNNING_THE_APP.md), and [Troubleshooting](getting-started/TROUBLESHOOTING.md).
 
-## What the app does
+## What the game does
 
-| Feature | Where it lives | Notes |
+The screen splits into two zones. Player 1 owns the left side, Player 2 owns the right. Every tap pushes the center divider toward the opponent. The first player to push the divider into the opposite win zone (after **20 net taps**) wins the round.
+
+| Piece | Where it lives | Notes |
 |---|---|---|
-| **Create / read / update / delete tasks** | `domain/TaskRepository`, `ui/edit/*` | One screen handles both new and existing tasks |
-| **Title, notes, category, priority, due date, done** | `domain/Task`, `domain/TaskDraft` | All fields shared across every platform |
-| **Priority levels (Low / Medium / High)** | `domain/Priority` | Stored as `INTEGER`; UI uses Material 3 `FilterChip` + colored badges |
-| **Due dates with date picker** | `ui/edit/TaskEditScreen` | Material 3 `DatePicker`; persisted as epoch millis |
-| **Filter (All / Active / Done) + free-text search** | `ui/list/TaskListViewModel` | Filter persists in app settings; search is in-memory over title/notes/category |
-| **Mark done with strikethrough** | `ui/list/TaskListScreen` | Toggling re-sorts: active first, by priority, by due date |
-| **Clear completed** | Top bar action | One-shot `DELETE FROM task WHERE is_done = 1` |
-| **Categories suggested from existing tasks** | `Tasks.sq` `distinctCategories` | Reactive `Flow<List<String>>` |
-| **Theme: System / Light / Dark** | `ui/theme/AppTheme`, `ui/settings/*` | Persisted per-device via `multiplatform-settings` |
-| **i18n: English + Spanish** | `composeResources/values{,-es}/` | Picked from system locale |
-| **Adaptive layout (single-pane vs list+detail)** | `App.kt` | `BoxWithConstraints` threshold of 720 dp |
-| **Share a task** | `platform/TaskSharer` (`expect/actual`) | Native share sheet on Android/iOS, clipboard on Desktop, `navigator.clipboard` on Web |
-| **Persistence** | Per-platform — see below | All four "real" targets keep tasks across reboots |
+| **Game state** | `game/TapDuelState.kt` | `@Immutable` data class. `dividerPosition` is derived from tap counts, so float drift never affects the win check. |
+| **Game engine** | `game/TapDuelGame.kt` | Pure functions: `reset`, `start`, `tapPlayerOne`, `tapPlayerTwo`. Trivially testable. |
+| **Player + status enums** | `game/Player.kt`, `game/GameStatus.kt` | `Player.One`/`Two`, `GameStatus.Ready`/`CountingDown`/`Playing`/`Finished`. |
+| **State holder** | `ui/TapDuelViewModel.kt` | Multiplatform `androidx.lifecycle.ViewModel`. Holds `StateFlow<TapDuelState>` plus `StateFlow<Int?>` for the countdown. |
+| **Countdown timer** | `ui/TapDuelViewModel.start()` | `viewModelScope.launch` with `delay()` from kotlinx-coroutines. Cancellable on reset. |
+| **Tap detection** | `ui/TapDuelScreen.kt` | `pointerInput { awaitEachGesture { awaitFirstDown(requireUnconsumed = false) } }` — every press counts, no swallowed events. |
+| **Adaptive layout** | `ui/TapDuelScreen.kt` | `BoxWithConstraints` threshold of 600 dp: horizontal split on tablet/desktop/web, vertical split on phones held portrait. |
+| **Animated divider** | `ui/TapDuelScreen.kt` | `animateFloatAsState` smooths the divider movement; weights are coerced to a small minimum so a zone never collapses to 0. |
+| **Material 3 theme** | `ui/theme/AppTheme.kt` | Cool blue → `colorScheme.primary`, warm red → `colorScheme.error`. Light + dark schemes ship in the same file. |
+| **i18n: EN + ES** | `composeResources/values{,-es}/strings.xml` | Picked from system locale. |
 
-## Persistence per target
+## Game flow
 
-`TaskRepository` is a single interface in `commonMain`. Two implementations satisfy it:
+```
+Ready  ──[Start]──▶  CountingDown  ──[delay 3·2·1·GO!]──▶  Playing
+                                                              │
+                                                          tap, tap, tap
+                                                              │
+                                                              ▼
+                                                          Finished  ──[Reset / Play again]──▶  Ready
+```
 
-| Target | Implementation | Storage backend |
-|---|---|---|
-| Android | `SqlTaskRepository` (`nonWebMain`) | `AndroidSqliteDriver` → `/data/data/<pkg>/databases/kmptodoapp.db` |
-| iOS | `SqlTaskRepository` (`nonWebMain`) | `NativeSqliteDriver` → app sandbox SQLite file |
-| Desktop JVM | `SqlTaskRepository` (`nonWebMain`) | `JdbcSqliteDriver` → `~/.kmptodoapp/kmptodoapp.db` |
-| Web (JS) | `InMemoryTaskRepository` (`webMain`) | `MutableStateFlow<List<Task>>` — resets on reload |
-| Web (Wasm) | `InMemoryTaskRepository` (`webMain`) | Same as JS |
+- `Ready` and `Finished`: taps are ignored by the engine.
+- `CountingDown`: taps are ignored, overlay shows `3 → 2 → 1 → GO!`.
+- `Playing`: taps mutate state. The engine resolves a winner when net taps hit `±TAPS_TO_WIN` (20).
 
-Web persistence is intentionally a follow-up — wiring SQLDelight's `web-worker-driver` requires webpack + `sqljs` setup, and the goal of v1 was to make sure every screen renders and behaves correctly on every target first. The `InMemoryTaskRepository` carries a `FIXME(web-persistence)` marker so the swap is easy to find.
+## State, not floats
 
-`AppSettings` (theme + filter) follows the same shape but persists everywhere via `multiplatform-settings`:
+The `dividerPosition` exposed to Compose is **derived** from `playerOneTaps - playerTwoTaps`:
 
-| Target | Settings backend |
-|---|---|
-| Android | `SharedPreferencesSettings` |
-| iOS | `NSUserDefaultsSettings` |
-| Desktop JVM | `PreferencesSettings` (`java.util.prefs`) |
-| Web (JS / Wasm) | `StorageSettings` over `localStorage` |
+```kotlin
+val dividerPosition: Float
+    get() = (INITIAL_POSITION + (playerOneTaps - playerTwoTaps) * TAP_STEP).coerceIn(0f, 1f)
+```
+
+That choice is deliberate — accumulating `+= 0.02f` for 20 iterations drifts. Recomputing from the integer counts is exact, and the win condition itself runs on the integer net difference, never on the float.
 
 ## Source set layout
 
 ```
 composeApp/src/
-├── commonMain/                     ← all UI, ViewModels, domain — shared by every target
-│   ├── kotlin/com/xergioalex/kmptodoapp/
-│   │   ├── App.kt                  ← single shared root composable + state-based routing
-│   │   ├── AppContainer.kt         ← DI-lite holder (TaskRepository, AppSettings, TaskSharer)
-│   │   ├── domain/                 ← Task, TaskDraft, Priority, TaskFilter, TaskRepository
-│   │   ├── settings/               ← AppSettings + ThemeMode (multiplatform-settings)
-│   │   ├── platform/               ← TaskSharer interface + share-text builder
-│   │   ├── ui/list, ui/edit, ui/settings, ui/theme
-│   │   └── ui/Formatters.kt        ← due-date formatter
+├── commonMain/                     ← all UI, ViewModel, engine, resources
+│   ├── kotlin/com/xergioalex/kmptapduelgame/
+│   │   ├── App.kt                  ← AppTheme { TapDuelScreen() }
+│   │   ├── Platform.kt             ← expect Platform contract (KMP demo, not used by gameplay)
+│   │   ├── game/                   ← Player, GameStatus, TapDuelState, TapDuelGame
+│   │   └── ui/
+│   │       ├── TapDuelScreen.kt    ← split arena, divider, counters, controls, overlays
+│   │       ├── TapDuelViewModel.kt ← StateFlow + viewModelScope countdown
+│   │       └── theme/AppTheme.kt   ← Material 3 light/dark
 │   └── composeResources/values{,-es}/strings.xml
 │
-├── nonWebMain/                     ← intermediate set seen only by Android / iOS / JVM
-│   ├── kotlin/.../data/SqlTaskRepository.kt
-│   ├── kotlin/.../data/DatabaseDriverFactory.kt    ← expect class
-│   └── sqldelight/com/xergioalex/kmptodoapp/db/Tasks.sq
+├── commonTest/                     ← pure-function engine tests with kotlin.test
+│   └── kotlin/com/xergioalex/kmptapduelgame/game/TapDuelGameTest.kt
 │
-├── androidMain/  ← MainActivity, AndroidTaskSharer, AndroidSqliteDriver actual
-├── iosMain/      ← MainViewController, IosTaskSharer, NativeSqliteDriver actual
-├── jvmMain/      ← Window { App() }, JvmTaskSharer (clipboard), JdbcSqliteDriver actual
-│
-├── webMain/      ← shared between JS + Wasm: ComposeViewport entry + InMemoryTaskRepository
-├── jsMain/       ← JsTaskSharer + createTaskSharer actual
-└── wasmJsMain/   ← WasmTaskSharer + createTaskSharer actual
+├── androidMain/    ← MainActivity sets content { App() }, Platform.android.kt
+├── iosMain/        ← MainViewController() returns ComposeUIViewController { App() }, Platform.ios.kt
+├── jvmMain/        ← application { Window { App() } }, Platform.jvm.kt
+├── jsMain/         ← Platform.js.kt
+├── wasmJsMain/     ← Platform.wasmJs.kt
+└── webMain/        ← shared JS+Wasm entry: ComposeViewport { App() }
 ```
 
-The `nonWebMain` intermediate source set is added manually:
+There's intentionally no `nonWebMain` and no platform bridge for gameplay. Compared to the [previous `kmptodoapp` incarnation](https://github.com/xergioalex/kmptodoapp), every piece below was removed because the game doesn't need it:
 
-```kotlin
-applyDefaultHierarchyTemplate()
-sourceSets {
-    val nonWebMain by creating { dependsOn(commonMain.get()) }
-    androidMain.get().dependsOn(nonWebMain)
-    iosMain.get().dependsOn(nonWebMain)
-    jvmMain.get().dependsOn(nonWebMain)
-}
-```
+- SQLDelight + `nonWebMain` (no persistence — local in-memory state)
+- multiplatform-settings (no preferences saved)
+- kotlinx-datetime (no due dates / timestamps)
+- per-platform `TaskSharer` (`expect/actual`) (no share intent)
+- `AppContainer` DI-lite holder (no dependencies to wire)
 
-That's how `SqlTaskRepository` is shared across the three "real device" targets without leaking SQLDelight into web builds.
+That's the point: KMP earns its keep when shared logic is meaningful and platform glue is reserved for genuine platform calls.
 
-## Architecture in three layers
+## Architecture in two layers
 
 ```
-                    ┌──────────────────────────────────┐
-   commonMain  →    │  ui/  (Compose screens + VMs)    │  StateFlow + collectAsStateWithLifecycle
-                    └──────────────┬───────────────────┘
+                ┌──────────────────────────────────────┐
+   commonMain   │  ui/ (TapDuelScreen + ViewModel)     │  StateFlow + collectAsState
+                └──────────────────┬───────────────────┘
                                    │ reads / mutates
                                    ▼
-                    ┌──────────────────────────────────┐
-                    │  domain/  (Task, Repository)     │  Pure Kotlin, zero platform deps
-                    └──────────────┬───────────────────┘
-                                   │ implements
-                                   ▼
-   nonWebMain  ┌────────────────────────────────────────┐
-   webMain     │  data/  (SqlTaskRepository,            │
-               │          InMemoryTaskRepository)        │
-               └────────────────┬───────────────────────┘
-                                │ uses
-                                ▼
-   androidMain / iosMain / jvmMain  →  expect/actual DatabaseDriverFactory
+                ┌──────────────────────────────────────┐
+                │  game/ (Player, State, GameEngine)   │  Pure Kotlin, zero platform deps
+                └──────────────────────────────────────┘
 ```
 
-- **`domain/` is dependency-free Kotlin.** No Android Context, no UIKit, no `Settings`, no SQLDelight types — just `Task`, `Priority`, `TaskFilter`, `TaskDraft`, `TaskRepository`. This makes it trivially testable (no mocks, no DI framework required).
-- **`data/` lives one source set higher.** `SqlTaskRepository` only compiles for Android/iOS/JVM (`nonWebMain`). `InMemoryTaskRepository` only compiles for JS/Wasm (`webMain`). Each entry point hands the right one into the `AppContainer`.
-- **`ui/` reads from `domain/`.** Screens hold no business logic; ViewModels expose `StateFlow<UiState>` produced by `combine(repository.observeAll(), settings.filter, query)`.
+- **`game/` is dependency-free Kotlin.** No Compose, no coroutines, no Android Context. Trivially testable — see `TapDuelGameTest`.
+- **`ui/` orchestrates.** `TapDuelViewModel` owns state. `TapDuelScreen` reads it and dispatches taps.
 
 ## How the KMP tools are exercised here
 
 | Pattern | Where to look |
 |---|---|
-| **Shared composables** | `App.kt`, `ui/list`, `ui/edit`, `ui/settings`, `ui/theme` — all in `commonMain`. No per-platform `App` clones. |
-| **`expect class` / `actual class`** | `data/DatabaseDriverFactory` (one expect in `nonWebMain`, three actuals: Android/iOS/JVM) |
-| **`expect fun` / `actual fun`** | `createTaskSharer()` in `webMain`, with JS + Wasm actuals |
-| **Interface + per-platform impl** | `platform/TaskSharer` — five concrete implementations using each platform's native share API |
-| **Custom source set hierarchy** | The `nonWebMain` group, manually wired so Android/iOS/JVM share `SqlTaskRepository` without dragging it into web |
-| **Compose Multiplatform resources** | `composeResources/values/strings.xml` + `values-es/strings.xml`; consumed via `Res.string.*` from the generated `kmptodoapp.composeapp.generated.resources` package |
-| **Reactive data layer** | `Tasks.sq` queries → SQLDelight `Query.asFlow()` → `mapToList` → repository `Flow<List<Task>>` → `combine` in the ViewModel |
-| **One-shot navigation events** | `TaskEditViewModel` exposes a `Channel<TaskEditEffect>` for `Saved`/`Deleted`/`NotFound` — UI state holds form fields only, so cached ViewModels never replay stale "saved" flags |
-| **`androidx.lifecycle` ViewModels in common code** | `TaskListViewModel`, `TaskEditViewModel`, `SettingsViewModel` all extend the multiplatform `ViewModel` |
-| **Multiplatform `kotlin.time`** | Domain uses `kotlin.time.Instant` and `kotlin.time.Clock` (the future-proof stdlib types); kotlinx-datetime supplies only `LocalDateTime` + `TimeZone` for formatting |
-
-## DI-lite via `AppContainer`
-
-There's no Koin / Kodein / Dagger — just a small data class:
-
-```kotlin
-data class AppContainer(
-    val tasks: TaskRepository,
-    val settings: AppSettings,
-    val sharer: TaskSharer,
-)
-```
-
-Each entry point builds its own `AppContainer` with the implementations that fit its target, then hands it to `App(container)`. Composables read it as a parameter. Cheap, explicit, refactor-friendly.
-
-```kotlin
-// Desktop entry point
-val container = AppContainer(
-    tasks = SqlTaskRepository(DatabaseDriverFactory()),
-    settings = AppSettings(PreferencesSettings(Preferences.userRoot().node("com/xergioalex/kmptodoapp"))),
-    sharer = JvmTaskSharer(),
-)
-application { Window(...) { App(container) } }
-```
-
-```kotlin
-// Web entry point
-val container = AppContainer(
-    tasks = InMemoryTaskRepository(),
-    settings = AppSettings(StorageSettings()),
-    sharer = createTaskSharer(),
-)
-ComposeViewport { App(container) }
-```
-
-When the app grows enough to justify a real DI framework, the swap is local to those four entry points.
+| **Shared composables** | `TapDuelScreen.kt` and the whole `ui/` tree run on every target. No per-platform `App` clones. |
+| **`expect fun` / `actual fun`** | `Platform.kt` in `commonMain` + `Platform.<platform>.kt` actuals in five source sets. Kept as a teaching example even though gameplay doesn't need it. |
+| **Multiplatform `ViewModel`** | `TapDuelViewModel` extends `androidx.lifecycle.ViewModel` and uses `viewModelScope` — works identically on Android, iOS, JVM, JS, and Wasm. |
+| **Compose Multiplatform resources** | `composeResources/values/strings.xml` + `values-es/strings.xml`; consumed via `Res.string.*` from the generated `kmptapduelgame.composeapp.generated.resources` package. |
+| **Multiplatform pointer input** | `pointerInput { awaitEachGesture { awaitFirstDown() } }` works for touch on Android/iOS, mouse on Desktop, and pointer events on Web — same code, every platform. |
+| **`@Immutable` for stable Compose recomposition** | `TapDuelState` is annotated `@Immutable` so Compose can skip recomposition when only an unrelated piece of state changes. |
+| **kotlin.test in `commonTest`** | `TapDuelGameTest` runs on every Kotlin target with no platform dependencies. |
 
 ## Build & run
 
@@ -183,11 +129,11 @@ When the app grows enough to justify a real DI framework, the swap is local to t
 
 Hooks intentionally left for follow-ups:
 
-- **Web persistence**: swap `InMemoryTaskRepository` for SQLDelight's `web-worker-driver` (needs webpack + `sqljs` resource setup).
-- **Local reminders**: `expect/actual` over `AlarmManager` (Android) / `UNUserNotificationCenter` (iOS) / `java.util.Timer` or system tray (Desktop). The `dueAt` field is already in the domain.
-- **Sub-tasks**: extend the schema with a self-referencing `parent_task_id` plus a nested checklist UI.
-- **Drag-to-reorder** on the list, persisting an `order_index`.
-- **Tests** in `commonTest` for `TaskListViewModel` (filter + search) — the logic is pure and trivially exercisable.
-- **Common ViewModel tests** with `kotlinx-coroutines-test`.
+- **Best-of-3 / round counter** — track wins across rounds; small extension of `TapDuelViewModel`.
+- **Sound + haptics** per tap — `expect/actual` over Android `Vibrator` / iOS `UIImpactFeedbackGenerator` / a no-op on Desktop+Web. First real platform-bridge use case.
+- **High-score persistence** — re-introduce multiplatform-settings to remember the all-time fastest win.
+- **Tilt / motion** as input on mobile, falling back to taps on Desktop+Web.
+- **AI single-player mode** — pure logic in `commonMain`, no platform code needed.
+- **Tests for `TapDuelViewModel`** with `kotlinx-coroutines-test` — covers the countdown timer end-to-end.
 
-None of these need cross-platform plumbing — they're product decisions waiting for a product owner.
+None of these need cross-platform plumbing for the engine — they're product decisions waiting for a product owner.

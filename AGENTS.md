@@ -29,31 +29,31 @@
 
 ## Project Overview
 
-**KMPTodoApp** — a cross-platform Todo app built with Kotlin Multiplatform and Compose Multiplatform. The shared `:composeApp` module produces apps for **Android, iOS (arm64 + simulator arm64), Desktop JVM, Web JS, and Web Wasm** from a single Compose UI written in `commonMain`.
+**KMPTapDuelGame (Tap Duel)** — a local 2-player tap battle built with Kotlin Multiplatform and Compose Multiplatform. The shared `:composeApp` module produces apps for **Android, iOS (arm64 + simulator arm64), Desktop JVM, Web JS, and Web Wasm** from a single Compose UI written in `commonMain`.
+
+The screen splits into two zones. Player 1 taps the left side; Player 2 taps the right. Every tap pushes the center divider toward the opponent. First player to push the divider into the opposite win zone wins. Local, in-memory, no backend.
 
 **Feature set (v1):**
-- Full CRUD with title, notes, category, priority (Low / Medium / High), due date, done flag
-- Filter (All / Active / Done) + free-text search; mark done with strikethrough; clear-completed action
-- Material 3 date picker for due dates; theme switcher (System / Light / Dark) persisted per device
+- Pure-Kotlin game engine in `commonMain` (`game/TapDuelGame.kt`) — fully unit-tested in `commonTest`
+- Compose Multiplatform UI: split arena, animated divider, large tap counters, countdown overlay, winner overlay
+- Adaptive layout — horizontal split on tablet/desktop/web (≥ 600 dp), vertical split on phones held portrait
+- Multiplatform `ViewModel` (androidx-lifecycle 2.10) holds `StateFlow<TapDuelState>` and runs the countdown via `viewModelScope`
+- `pointerInput { awaitEachGesture { awaitFirstDown() } }` so every press counts on touch and mouse — no missed rapid taps
 - i18n EN + ES via Compose Multiplatform resources; locale follows the system
-- Adaptive layout (single-pane on phones, list+detail on tablet/desktop/web ≥ 720 dp)
-- Native share via `expect/actual`: Android Intent / iOS `UIActivityViewController` / Desktop clipboard / browser `navigator.clipboard`
-- Persistent storage on Android, iOS, Desktop via SQLDelight (real SQLite). Web (JS/Wasm) is in-memory in v1; SQLDelight `web-worker-driver` is a documented follow-up
+- Material 3 theming with a cool/warm palette mapped to `colorScheme.primary` / `colorScheme.error` so dark mode works out of the box
+- Demonstrates `expect/actual` via `Platform.kt` even though the game itself doesn't need a platform bridge
 
-> **Read [App Overview](docs/APP_OVERVIEW.md) first.** It walks the feature list against the source set layout and shows which KMP patterns each piece exercises.
+> **Read [App Overview](docs/APP_OVERVIEW.md) first.** It walks the game pieces against the source set layout and shows which KMP patterns each part exercises.
 
-Bootstrapped from [`xergioalex/kmpstarter`](https://github.com/xergioalex/kmpstarter). Renameable identifiers from the upstream starter are still flagged in source with `// FORK-RENAME:` comments — `grep -rn 'FORK-RENAME' .` to list them. See [Fork Customization](docs/FORK_CUSTOMIZATION.md) if you re-fork this repo into another product.
+Bootstrapped from [`xergioalex/kmpstarter`](https://github.com/xergioalex/kmpstarter) → [`xergioalex/kmptodoapp`](https://github.com/xergioalex/kmptodoapp), then transformed into Tap Duel. See [Fork Customization](docs/FORK_CUSTOMIZATION.md) if you re-fork this repo into another product.
 
 **Technology Stack** (full list with versions: [Technologies](docs/TECHNOLOGIES.md))
 
 - **Kotlin 2.3.20** — Multiplatform language
 - **Compose Multiplatform 1.10.3** — Shared declarative UI
 - **Material 3 1.10.0-alpha05** — Design system
-- **AndroidX Lifecycle 2.10.0** — `viewmodel-compose`, `runtime-compose`
-- **SQLDelight 2.1.0** — Type-safe SQLite for Android / iOS / JVM (`nonWebMain`)
-- **multiplatform-settings 1.2.0** — Persistent key-value backed by `SharedPreferences` / `NSUserDefaults` / `java.util.prefs` / `localStorage`
-- **kotlinx-datetime 0.7.1** — `LocalDateTime` + `TimeZone` formatting; pairs with `kotlin.time` for `Instant`/`Clock`
-- **kotlinx-coroutines 1.10.2** — Core + `kotlinx-coroutines-swing` (Desktop dispatcher)
+- **AndroidX Lifecycle 2.10.0** — `viewmodel-compose`, `runtime-compose` (multiplatform `ViewModel`)
+- **kotlinx-coroutines 1.10.2** — Backs `viewModelScope` and the countdown timer
 - **Compose Hot Reload 1.0.0** — Live reload on Desktop JVM
 - **AGP 8.11.2** — Android Gradle Plugin (compileSdk 36, minSdk 24, targetSdk 36)
 - **Java 11** — Source/target compatibility (build with **JDK 21** — Gradle 8.14 doesn't yet recognize newer JDKs)
@@ -66,28 +66,23 @@ Bootstrapped from [`xergioalex/kmpstarter`](https://github.com/xergioalex/kmpsta
 ```
 composeApp/
 └── src/
-    ├── commonMain/kotlin/com/xergioalex/kmptodoapp/
-    │   ├── App.kt                      # Shared root + state-based routing + adaptive layout
-    │   ├── AppContainer.kt             # DI-lite holder (TaskRepository, AppSettings, TaskSharer)
-    │   ├── domain/                     # Task, TaskDraft, Priority, TaskFilter, TaskRepository
-    │   ├── settings/                   # AppSettings + ThemeMode (multiplatform-settings)
-    │   ├── platform/                   # TaskSharer interface + share-text builder
-    │   ├── ui/list/, ui/edit/, ui/settings/, ui/theme/
-    │   └── ui/Formatters.kt
+    ├── commonMain/kotlin/com/xergioalex/kmptapduelgame/
+    │   ├── App.kt                      # Shared root: AppTheme { TapDuelScreen() }
+    │   ├── Platform.kt                 # expect Platform contract (kept for KMP demo value)
+    │   ├── game/                       # Pure engine — Player, GameStatus, TapDuelState, TapDuelGame
+    │   └── ui/
+    │       ├── TapDuelScreen.kt        # Split arena, divider, counters, controls, overlays
+    │       ├── TapDuelViewModel.kt     # androidx.lifecycle.ViewModel + countdown coroutine
+    │       └── theme/AppTheme.kt       # Material 3 light/dark schemes (cool blue / warm red)
     ├── commonMain/composeResources/values{,-es}/strings.xml   # i18n EN + ES
-    ├── commonTest/kotlin/                                       # Shared kotlin.test tests
+    ├── commonTest/kotlin/.../game/TapDuelGameTest.kt           # Pure-function engine tests
     │
-    ├── nonWebMain/                     # Intermediate set seen only by Android/iOS/JVM
-    │   ├── kotlin/.../data/SqlTaskRepository.kt
-    │   ├── kotlin/.../data/DatabaseDriverFactory.kt    # expect class
-    │   └── sqldelight/com/xergioalex/kmptodoapp/db/Tasks.sq
-    │
-    ├── androidMain/    # MainActivity, AndroidTaskSharer, AndroidSqliteDriver actual
-    ├── iosMain/        # MainViewController, IosTaskSharer, NativeSqliteDriver actual
-    ├── jvmMain/        # Window { App() }, JvmTaskSharer (clipboard), JdbcSqliteDriver actual
-    ├── webMain/        # Shared between JS+Wasm: ComposeViewport entry + InMemoryTaskRepository
-    ├── jsMain/         # JsTaskSharer + createTaskSharer actual
-    └── wasmJsMain/     # WasmTaskSharer + createTaskSharer actual
+    ├── androidMain/    # MainActivity (sets content App()), Platform.android.kt
+    ├── iosMain/        # MainViewController() returning ComposeUIViewController, Platform.ios.kt
+    ├── jvmMain/        # main.kt with Window { App() }, Platform.jvm.kt
+    ├── jsMain/         # Platform.js.kt
+    ├── wasmJsMain/     # Platform.wasmJs.kt
+    └── webMain/        # Shared JS+Wasm entry: ComposeViewport { App() }
 
 iosApp/                         # Xcode project consuming the iOS framework `ComposeApp`
 gradle/libs.versions.toml       # Single version catalog — pin all dependencies here
@@ -166,7 +161,7 @@ Kotlin imports follow `kotlin.code.style=official` ordering — **alphabetical, 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import com.xergioalex.kmptodoapp.Greeting
+import com.xergioalex.kmptapduelgame.Greeting
 import org.jetbrains.compose.resources.painterResource
 ```
 
@@ -196,7 +191,7 @@ If you add **ktlint** or **detekt**, document the wired tasks in [Development Co
 Run a single test:
 
 ```bash
-./gradlew :composeApp:jvmTest --tests "com.xergioalex.kmptodoapp.ComposeAppCommonTest.example"
+./gradlew :composeApp:jvmTest --tests "com.xergioalex.kmptapduelgame.game.TapDuelGameTest.playerOneWinsAfterEnoughNetTaps"
 ```
 
 Tests live in `composeApp/src/commonTest/` (shared) and `composeApp/src/<platform>Test/` (platform-specific). Conventions: **[Testing Guide](docs/TESTING_GUIDE.md)**.
@@ -206,7 +201,7 @@ Tests live in `composeApp/src/commonTest/` (shared) and `composeApp/src/<platfor
 Use Compose Multiplatform resources — **not** per-platform asset folders — for any image/string/font that should be shared.
 
 - Drop assets in `composeApp/src/commonMain/composeResources/{drawable,values,font,files}/`
-- Access via the generated `kmptodoapp.composeapp.generated.resources.Res` (e.g., `Res.drawable.compose_multiplatform`)
+- Access via the generated `kmptapduelgame.composeapp.generated.resources.Res` (e.g., `Res.drawable.compose_multiplatform`)
 - Localized strings live under `values-<locale>/strings.xml` (e.g., `values-es/strings.xml`); read with `stringResource(Res.string.app_name)`
 
 **Never** hardcode user-visible strings in composables — wrap them in `stringResource(...)`. Full workflow: **[I18N Guide](docs/I18N_GUIDE.md)**.
@@ -411,8 +406,8 @@ When a command is invoked (via `/`, `#`, or by name), the agent MUST:
 **Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`
 
 Examples:
-- `feat: add task list screen with shared state`
-- `fix: align iOS safe area in App.kt`
+- `feat: add countdown overlay before round start`
+- `fix: align iOS safe area in TapDuelScreen`
 - `chore: bump compose multiplatform to 1.10.4`
 - `build: enable R8 for android release`
 - `docs: document hot reload workflow`

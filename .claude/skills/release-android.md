@@ -48,7 +48,7 @@ Create `composeApp/proguard-rules.pro`:
 
 ```proguard
 # Compose Multiplatform / Kotlin/Native generated classes
--keep class com.xergioalex.kmptodoapp.** { *; }
+-keep class com.xergioalex.kmptapduelgame.** { *; }
 -dontwarn org.jetbrains.compose.**
 
 # Add per-library rules from each library's docs as you adopt them:
@@ -60,9 +60,9 @@ Create `composeApp/proguard-rules.pro`:
 Store credentials outside the repo. Add to `~/.gradle/gradle.properties`:
 
 ```properties
-KMPTODOAPP_KEYSTORE_FILE=/Users/you/keys/kmptodoapp-release.keystore
+KMPTODOAPP_KEYSTORE_FILE=/Users/you/keys/kmptapduelgame-release.keystore
 KMPTODOAPP_KEYSTORE_PASSWORD=...
-KMPTODOAPP_KEY_ALIAS=kmptodoapp
+KMPTODOAPP_KEY_ALIAS=kmptapduelgame
 KMPTODOAPP_KEY_PASSWORD=...
 ```
 
@@ -172,7 +172,7 @@ Suggested GitHub Actions skeleton (Linux runner):
 - uses: r0adkll/upload-google-play@v1
   with:
     serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-    packageName: com.xergioalex.kmptodoapp
+    packageName: com.xergioalex.kmptapduelgame
     releaseFiles: composeApp/build/outputs/bundle/release/composeApp-release.aab
     track: internal
 ```

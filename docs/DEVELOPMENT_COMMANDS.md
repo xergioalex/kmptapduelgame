@@ -23,7 +23,7 @@ Reference for every Gradle task you'll run during day-to-day development. The Gr
 ./gradlew :composeApp:packageReleaseDistributionForCurrentOS  # Same, optimized
 ```
 
-The desktop main class is `com.xergioalex.kmptodoapp.MainKt` — set in `composeApp/build.gradle.kts`.
+The desktop main class is `com.xergioalex.kmptapduelgame.MainKt` — set in `composeApp/build.gradle.kts`.
 
 ### Android
 
@@ -33,7 +33,7 @@ The desktop main class is `com.xergioalex.kmptodoapp.MainKt` — set in `compose
 ./gradlew :composeApp:assembleRelease       # Build release APK (currently unsigned, no R8)
 ./gradlew :composeApp:bundleRelease         # Build release AAB for Play Store
 ./gradlew :composeApp:lint                  # Android lint (when configured)
-adb logcat | grep KMPTodoApp                  # Tail logs
+adb logcat | grep KMPTapDuelGame                  # Tail logs
 ```
 
 The debug APK lands at `composeApp/build/outputs/apk/debug/composeApp-debug.apk`.
@@ -84,8 +84,8 @@ Or use the **IDE's KMP run config** (Android Studio with the KMP plugin, or Flee
 ### Single test
 
 ```bash
-./gradlew :composeApp:jvmTest --tests "com.xergioalex.kmptodoapp.ComposeAppCommonTest.example"
-./gradlew :composeApp:jvmTest --tests "com.xergioalex.kmptodoapp.ComposeAppCommonTest"   # All in class
+./gradlew :composeApp:jvmTest --tests "com.xergioalex.kmptapduelgame.ComposeAppCommonTest.example"
+./gradlew :composeApp:jvmTest --tests "com.xergioalex.kmptapduelgame.ComposeAppCommonTest"   # All in class
 ./gradlew :composeApp:jvmTest --tests "*Greeting*"                                     # Pattern match
 ```
 

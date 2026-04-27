@@ -1,41 +1,65 @@
-# KMPTodoApp
+# Tap Duel (KMPTapDuelGame)
 
-A cross-platform Todo app written **once in `commonMain`** with Kotlin Multiplatform + Compose Multiplatform, and shipped to **Android, iOS, Desktop (JVM), Web (Wasm), and Web (JS)** from a single shared module.
+A local 2-player tap battle written **once in `commonMain`** with Kotlin Multiplatform + Compose Multiplatform, and shipped to **Android, iOS, Desktop (JVM), Web (Wasm), and Web (JS)** from a single shared module.
 
-The point of this project is to exercise the real bondades of KMP — shared domain, shared UI, platform code only where it earns its keep — on a small but realistic product.
+The screen splits into two zones. Player 1 taps the left side; Player 2 taps the right. Every tap pushes the center divider toward the opponent. First player to push the divider into the opposite win zone wins.
 
-![KMPTodoApp running on the Android emulator alongside the source tree in Android Studio](assets/android_studio_setup.png)
+The point of this project is to show the real bondades of KMP — shared game logic, shared UI, platform code only where it earns its keep — on a tiny but complete game.
+
+## How the game works
+
+```
+┌────────────────────────────┬──────────────────────────────┐
+│                            │                              │
+│        PLAYER 1            │          PLAYER 2            │
+│        (taps  X)           │          (taps  Y)           │
+│                            │                              │
+│                            ‖                              │
+└────────────────────────────┴──────────────────────────────┘
+                             ↑
+                       moving divider
+```
+
+- The divider starts at the center (`0.5`).
+- Each tap on the left side pushes it right by `TAP_STEP` (`0.02`).
+- Each tap on the right side pushes it left by `TAP_STEP`.
+- After **20 net taps** in either direction (`TAPS_TO_WIN`), the round ends.
+- A winner overlay appears with final tap counts and a *Play again* button.
+
+The game itself is in-memory only — no save state, no backend, no accounts.
 
 ## Features
 
-- **Full CRUD** with title, notes, category, priority (Low / Medium / High), due date, and done flag
-- **Filter** by *All / Active / Done* (filter persists across sessions) and **free-text search** over title / notes / category
-- **Mark done with strikethrough**; the list re-sorts so active tasks come first, then by priority and due date
-- **Material 3 date picker** for due dates
-- **Theme**: System / Light / Dark — your choice persists per device
-- **i18n out of the box**: English + Spanish; the app picks up the system locale
-- **Adaptive layout**: single-pane on phones, list + detail on tablets / desktop / web (≥ 720 dp wide)
-- **Native share** per platform: Android intent / iOS share sheet / Desktop clipboard / browser `navigator.clipboard`
-- **Persistent storage** on Android, iOS and Desktop via SQLite (SQLDelight). Web is in-memory in v1 (see [App Overview → What's next](docs/APP_OVERVIEW.md#whats-next))
-
-> **Want the full story** — feature list, source set layout, persistence backends per platform, and which KMP patterns each piece exercises? Read **[`docs/APP_OVERVIEW.md`](docs/APP_OVERVIEW.md)**.
+- Pure-Kotlin game engine in `commonMain` (`game/TapDuelGame.kt`) with full unit tests in `commonTest`
+- Multiplatform `ViewModel` (androidx-lifecycle 2.10) holds the `StateFlow<TapDuelState>` and the `3 · 2 · 1 · GO!` countdown
+- `pointerInput { awaitEachGesture { awaitFirstDown() } }` so every press counts on touch and mouse — no missed rapid taps
+- Adaptive layout — horizontal split on tablet/desktop/web (≥ 600 dp), vertical split on phones held portrait
+- Material 3 theming with a cool/warm palette mapped to `colorScheme.primary` / `colorScheme.error` so dark mode works out of the box
+- i18n EN + ES via Compose Multiplatform resources; locale follows the system
+- Demonstrates `expect/actual` with `Platform.kt`, even though the game itself doesn't need a platform bridge
 
 ## Architecture at a glance
 
 ```
-commonMain          domain/   →   ui/   (StateFlow ViewModels, Compose screens, Material 3 theme)
-                       ▲
-                       │ implements
-                       │
-nonWebMain          data/SqlTaskRepository (SQLDelight)        ── android / ios / jvm
-webMain             data/InMemoryTaskRepository (StateFlow)    ── jsMain   / wasmJsMain
+commonMain
+  ├── game/                  Pure engine: Player, GameStatus, TapDuelState, TapDuelGame
+  ├── ui/
+  │   ├── TapDuelScreen.kt   Split arena, divider, counters, controls, overlays
+  │   ├── TapDuelViewModel.kt  StateFlow + viewModelScope countdown
+  │   └── theme/AppTheme.kt    Material 3 light/dark schemes
+  └── App.kt                  AppTheme { TapDuelScreen() }
+
+androidMain  → MainActivity sets content { App() }
+iosMain      → MainViewController() returns ComposeUIViewController { App() }
+jvmMain      → application { Window { App() } }
+webMain      → ComposeViewport { App() } (shared by JS + Wasm)
 ```
 
-- All UI, ViewModels, and the domain model live in `commonMain` — no per-platform clones.
-- `TaskRepository` is one interface with two implementations split by an intermediate `nonWebMain` source set.
-- Platform-only concerns (database driver, settings backend, native share) sit behind `expect`/`actual` or behind small per-platform classes injected via an `AppContainer` data class.
+- All UI, the ViewModel, and the engine live in `commonMain` — no per-platform clones.
+- Platform source sets contain only the entry-point glue and a tiny `Platform.kt` `expect/actual` demo.
+- No `nonWebMain`, no SQL, no settings storage — the game is intentionally simple.
 
-The whole thing reads like a normal Android Compose app with the platform glue moved outside `commonMain`. See [App Overview](docs/APP_OVERVIEW.md) and [Architecture](docs/ARCHITECTURE.md) for the long version.
+See [App Overview](docs/APP_OVERVIEW.md) and [Architecture](docs/ARCHITECTURE.md) for the long version.
 
 ## Tech stack
 
@@ -43,11 +67,9 @@ The whole thing reads like a normal Android Compose app with the platform glue m
 |---|---|---|
 | **Kotlin Multiplatform** | 2.3.20 | Shared language across all targets |
 | **Compose Multiplatform** | 1.10.3 | Shared declarative UI on every target |
-| **Material 3** | 1.10.0-alpha05 | Design system, theming, date picker |
+| **Material 3** | 1.10.0-alpha05 | Design system, theming, animations |
 | **AndroidX Lifecycle (KMP)** | 2.10.0 | `ViewModel` + `viewModelScope` in `commonMain` |
-| **SQLDelight** | 2.1.0 | Type-safe SQLite for Android / iOS / JVM |
-| **kotlinx-datetime** | 0.7.1 | `LocalDateTime` + `TimeZone` formatting; pairs with `kotlin.time` for `Instant` / `Clock` |
-| **multiplatform-settings** | 1.2.0 | Persistent key-value (theme, filter) on every target |
+| **kotlinx-coroutines** | 1.10.2 | Backs the countdown timer |
 | **Compose Hot Reload** | 1.0.0 | Live reload while iterating on Desktop |
 
 Full catalog with rationale: [docs/TECHNOLOGIES.md](docs/TECHNOLOGIES.md).
@@ -68,6 +90,13 @@ Full catalog with rationale: [docs/TECHNOLOGIES.md](docs/TECHNOLOGIES.md).
 # iOS: open iosApp/iosApp.xcodeproj in Xcode and ⌘R
 ```
 
+Run the tests:
+
+```bash
+./gradlew :composeApp:jvmTest        # Engine tests, fastest target
+./gradlew :composeApp:allTests       # All targets that support tests
+```
+
 Full command reference: [docs/DEVELOPMENT_COMMANDS.md](docs/DEVELOPMENT_COMMANDS.md).
 
 ## Getting started (new to KMP?)
@@ -81,7 +110,7 @@ If this is your first Kotlin Multiplatform project on macOS, walk these in order
 
 ## What's inside
 
-- `composeApp/` — the only Gradle subproject. Shared UI in `commonMain`, SQL repository in `nonWebMain`, in-memory repository in `webMain`, platform glue in `androidMain` / `iosMain` / `jvmMain` / `jsMain` / `wasmJsMain`
+- `composeApp/` — the only Gradle subproject. Shared UI + engine in `commonMain`, platform entry points in `androidMain` / `iosMain` / `jvmMain` / `jsMain` / `wasmJsMain` / `webMain`
 - `iosApp/` — Xcode project that consumes the `ComposeApp` framework
 - `gradle/libs.versions.toml` — single version catalog (every dependency pinned here)
 - `docs/` — full documentation set (see below)
@@ -110,7 +139,7 @@ If this is your first Kotlin Multiplatform project on macOS, walk these in order
 
 ## Project history
 
-Bootstrapped from [`xergioalex/kmpstarter`](https://github.com/xergioalex/kmpstarter). Renameable identifiers from the upstream starter are flagged in source with `// FORK-RENAME:` comments — `grep -rn 'FORK-RENAME' .` to list them.
+Bootstrapped from [`xergioalex/kmpstarter`](https://github.com/xergioalex/kmpstarter), turned into a Todo app at [`xergioalex/kmptodoapp`](https://github.com/xergioalex/kmptodoapp), then transformed into Tap Duel.
 
 ## License
 
